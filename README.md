@@ -45,6 +45,7 @@ Currently, we have built-in support for the following alert types:
 - Commands
 - HipChat
 - MS Teams
+- Ryver
 - Slack
 - Telegram
 - GoogleChat

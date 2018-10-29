@@ -23,8 +23,9 @@ from elastalert.alerts import SlackAlerter
 from elastalert.alerts import StrideAlerter
 from elastalert.config import load_modules
 from elastalert.opsgenie import OpsGenieAlerter
+from elastalert.ryver import RyverAlerter
 from elastalert.util import ts_add
-from elastalert.util import ts_now
+from elastalert.util import ts_now, EAException
 
 
 class mock_rule:
@@ -1957,6 +1958,49 @@ def test_hipchat_body_size_limit_html():
     body = alert.create_alert_body([match])
 
     assert len(body) <= 10000
+
+
+def test_ryver_required_params():
+    # Test that only one and only one of ryver_forum_id, ryver_team_id, ryver_topic_id is required
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert': [],
+        'ryver_auth_basic': "auth",
+        'ryver_organization': "organization",
+    }
+
+    with pytest.raises(EAException):
+        RyverAlerter(rule)
+
+    rule['ryver_topic_id'] = 123
+    alerter = RyverAlerter(rule)
+
+    assert alerter.ryver_forum_id is None
+    assert alerter.ryver_team_id is None
+    assert alerter.ryver_topic_id == 123
+
+    rule['ryver_forum_id'] = 456
+    with pytest.raises(EAException):
+        RyverAlerter(rule)
+
+    del rule['ryver_topic_id']
+    alerter = RyverAlerter(rule)
+
+    assert alerter.ryver_forum_id == 456
+    assert alerter.ryver_team_id is None
+    assert alerter.ryver_topic_id is None
+
+    rule['ryver_team_id'] = 789
+    with pytest.raises(EAException):
+        RyverAlerter(rule)
+
+    del rule['ryver_forum_id']
+    alerter = RyverAlerter(rule)
+
+    assert alerter.ryver_forum_id is None
+    assert alerter.ryver_team_id == 789
+    assert alerter.ryver_topic_id is None
 
 
 def test_alerta_no_auth(ea):
