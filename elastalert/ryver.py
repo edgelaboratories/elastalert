@@ -1,7 +1,6 @@
-import json
 import requests
 
-from alerts import Alerter, DateTimeEncoder
+from alerts import Alerter
 from util import elastalert_logger, EAException
 
 
@@ -31,21 +30,6 @@ class RyverAlerter(Alerter):
         self.ryver_auth_basic = self.rule['ryver_auth_basic']
         self.ryver_organization = self.rule['ryver_organization']
 
-        self.url = 'https://%s.ryver.com/api/1/odata.svc' % (self.ryver_organization)
-
-        self.ryver_forum_id = self.rule.get('ryver_forum_id')
-        self.ryver_team_id = self.rule.get('ryver_team_id')
-        self.ryver_topic_id = self.rule.get('ryver_topic_id')
-
-        if len(filter(lambda x: x, [self.ryver_forum_id, self.ryver_team_id, self.ryver_topic_id])) != 1:
-            raise EAException(
-                'You need to specify one and only one of following options: '
-                'ryver_forum_id, ryver_team_id, ryver_topic_id'
-            )
-
-    def alert(self, matches):
-        body = self.create_alert_body(matches)
-
         sender = {}
         if self.rule.get('ryver_avatar'):
             sender['avatar'] = self.rule.get('ryver_avatar')
@@ -53,41 +37,59 @@ class RyverAlerter(Alerter):
         if self.rule.get('ryver_display_name'):
             sender['displayName'] = self.rule.get('ryver_display_name')
 
-        if self.ryver_topic_id:
-            url_path = "postComments?$format=json".format(self.url)
-            json_content = {
-                'comment': body,
-                'post': {"id": self.ryver_topic_id},
-            }
+        ryver_id_names = ['ryver_forum_id', 'ryver_team_id', 'ryver_topic_id']
+        url_path = None
+        for name in ryver_id_names:
+            ryver_id = self.rule.get(name)
+            if ryver_id is None:
+                continue
 
-        elif self.ryver_team_id:
-            url_path = "workrooms({})/Chat.PostMessage()".format(self.ryver_team_id)
-            json_content = {"body": body, "createSource": sender}
+            elif url_path is not None:
+                # Check that only one of ryver_names is configured
+                url_path = None
+                break
 
-        else:
-            url_path = "forums({})/Chat.PostMessage()".format(self.ryver_forum_id)
-            json_content = {"body": body, "createSource": sender}
+            if name == 'ryver_topic_id':
+                url_path = "postComments?$format=json"
+                self.content_factory = lambda body: {'comment': body, 'post': {'id': ryver_id}}
+                self.log_message = "Alert sent to Ryver forum: {}".format(ryver_id)
+
+            elif name == 'ryver_team_id':
+                url_path = "workrooms({})/Chat.PostMessage()".format(ryver_id)
+                self.content_factory = lambda body: {"body": body, "createSource": sender}
+                self.log_message = "Alert sent to Ryver team: {}".format(ryver_id)
+
+            elif name == 'ryver_forum_id':
+                url_path = "forums({})/Chat.PostMessage()".format(ryver_id)
+                self.content_factory = lambda body: {"body": body, "createSource": sender}
+                self.log_message = "Alert sent to Ryver forum: {}".format(ryver_id)
+
+        if url_path is None:
+            raise EAException(
+                'You need to specify one and only one of following options: '
+                'ryver_forum_id, ryver_team_id, ryver_topic_id'
+            )
+
+        self.url = "https://{}.ryver.com/api/1/odata.svc/{}".format(self.ryver_organization, url_path)
+        self.headers = {
+            'content-type': 'application/json',
+            'Authorization': 'Basic {}'.format(self.ryver_auth_basic),
+        }
+
+    def alert(self, matches):
+        body = self.create_alert_body(matches)
+        json_content = self.content_factory(body)
 
         try:
-            response = requests.post(
-                "{}/{}".format(self.url, url_path),
-                headers={
-                    'content-type': 'application/json',
-                    'Authorization': 'Basic {}'.format(self.ryver_auth_basic),
-                },
-                json=json_content
-            )
+            response = requests.post(self.url, headers=self.headers, json=json_content)
             response.raise_for_status()
         except requests.RequestException as e:
-            raise EAException("Error posting to Ryver: %s" % e)
+            raise EAException("Error posting to Ryver: {}".format(e))
 
-        elastalert_logger.info("Alert sent to Ryver topic %s" % self.ryver_topic_id)
+        elastalert_logger.info(self.log_message)
 
     def get_info(self):
         return {
             'type': 'ryver',
-            'ryver_organization': self.ryver_organization,
-            'ryver_forum_id': self.ryver_forum_id,
-            'ryver_team_id': self.ryver_team_id,
-            'ryver_topic_id': self.ryver_topic_id,
+            'url': self.url,
         }

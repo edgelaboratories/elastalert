@@ -1576,11 +1576,11 @@ The alerter requires the following two options:
 Ryver
 ~~~~~
 
-Ryver alerter will send a notification to a predefined topic in. The body of the notification is formatted the same as with other alerters. (Currently, this alerter only supports topic)
+Ryver alerter will send a notification to a predefined topic in. The body of the notification is formatted the same as with other alerters. (Currently, this alerter only supports topic.)
 
 The alerter requires the following options:
 
-``ryver_auth_basic``: Base64 encoded of 'user:password' for the user which will send the alert. (`Ryver does not support token yet <https://api.ryver.com/ryvrest_api_examples.html#authentication>`_ )
+``ryver_auth_basic``: ``user:password`` (base64 encoded or not) for the user which will send the alert. (`Ryver does not support token yet <https://api.ryver.com/ryvrest_api_examples.html#authentication>`_ )
 
 ``ryver_organization``: Your Ryver organization. (XXX part in your Ryver URL https://XXX.ryver.com/)
 
@@ -1589,7 +1589,6 @@ And one of the following:
 ``ryver_forum_id``: The ID of the forum in which you want to send the alert to. You can find it in the forum URL (https://XXX.ryver.com/index.html#forums/FORUM_ID/chat)
 
 ``ryver_team_id``: The ID of the team forum in which you want to send the alert to. You can find it in the team forum URL (https://XXX.ryver.com/index.html#teams/TEAM_ID/chat)
-
 
 ``ryver_topic_id``: The ID of the topic in which you want to send the alert to. You can find it in the topic URL (https://XXX.ryver.com/index.html#posts/TOPIC_ID)
 

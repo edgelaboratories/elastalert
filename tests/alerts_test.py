@@ -1976,9 +1976,7 @@ def test_ryver_required_params():
     rule['ryver_topic_id'] = 123
     alerter = RyverAlerter(rule)
 
-    assert alerter.ryver_forum_id is None
-    assert alerter.ryver_team_id is None
-    assert alerter.ryver_topic_id == 123
+    assert alerter.url == "https://organization.ryver.com/api/1/odata.svc/postComments?$format=json"
 
     rule['ryver_forum_id'] = 456
     with pytest.raises(EAException):
@@ -1987,9 +1985,7 @@ def test_ryver_required_params():
     del rule['ryver_topic_id']
     alerter = RyverAlerter(rule)
 
-    assert alerter.ryver_forum_id == 456
-    assert alerter.ryver_team_id is None
-    assert alerter.ryver_topic_id is None
+    assert alerter.url == "https://organization.ryver.com/api/1/odata.svc/forums(456)/Chat.PostMessage()"
 
     rule['ryver_team_id'] = 789
     with pytest.raises(EAException):
@@ -1998,9 +1994,7 @@ def test_ryver_required_params():
     del rule['ryver_forum_id']
     alerter = RyverAlerter(rule)
 
-    assert alerter.ryver_forum_id is None
-    assert alerter.ryver_team_id == 789
-    assert alerter.ryver_topic_id is None
+    assert alerter.url == "https://organization.ryver.com/api/1/odata.svc/workrooms(789)/Chat.PostMessage()"
 
 
 def test_alerta_no_auth(ea):
