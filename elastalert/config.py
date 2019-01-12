@@ -14,6 +14,7 @@ import yaml
 import yaml.scanner
 from envparse import Env
 from opsgenie import OpsGenieAlerter
+import ryver
 from staticconf.loader import yaml_loader
 from util import dt_to_ts
 from util import dt_to_ts_with_format
@@ -70,6 +71,7 @@ alerts_mapping = {
     'command': alerts.CommandAlerter,
     'sns': alerts.SnsAlerter,
     'hipchat': alerts.HipChatAlerter,
+    'ryver': ryver.RyverAlerter,
     'stride': alerts.StrideAlerter,
     'ms_teams': alerts.MsTeamsAlerter,
     'slack': alerts.SlackAlerter,
