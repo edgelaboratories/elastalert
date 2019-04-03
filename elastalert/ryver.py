@@ -76,8 +76,24 @@ class RyverAlerter(Alerter):
             'Authorization': 'Basic {}'.format(self.ryver_auth_basic),
         }
 
+    def fit_body(self, body, max_size=8192):
+        """Ryver limits the body size to 8192 characters maximum.
+
+        If a message is too big, Ryver raises a HTTP 400 error so we try to
+        accomodate the API before posting our alert.
+        """
+
+        truncated = " [... content too big]"
+
+        if len(body) <= max_size:
+            return body
+
+        body = body[0:max_size - len(truncated)]
+        return body + truncated
+
     def alert(self, matches):
         body = self.create_alert_body(matches)
+        body = self.fit_body(body) # limit body size
         json_content = self.content_factory(body)
 
         try:

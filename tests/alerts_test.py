@@ -1997,6 +1997,33 @@ def test_ryver_required_params():
     assert alerter.url == "https://organization.ryver.com/api/1/odata.svc/workrooms(789)/Chat.PostMessage()"
 
 
+def test_ryver_max_body():
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert': [],
+        'ryver_auth_basic': "auth",
+        'ryver_organization': "organization",
+        'ryver_topic_id': 47,
+    }
+
+    alerter = RyverAlerter(rule)
+    original = "a" * 50
+    max_size = 50
+
+    body = alerter.fit_body(original, max_size=max_size)
+    assert body == original
+    assert len(body) <= max_size
+
+    body = alerter.fit_body(original * 2, max_size=max_size)
+    assert body.endswith('content too big]')
+    assert len(body) <= max_size
+
+    # Maximum size officially supported by Ryver is 8192
+    body = alerter.fit_body("a" * 10000)
+    assert len(body) <= 8192
+
+
 def test_alerta_no_auth(ea):
     rule = {
         'name': 'Test Alerta rule!',
