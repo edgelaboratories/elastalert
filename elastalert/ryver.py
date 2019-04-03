@@ -98,11 +98,37 @@ class RyverAlerter(Alerter):
 
         try:
             response = requests.post(self.url, headers=self.headers, json=json_content)
-            response.raise_for_status()
         except requests.RequestException as e:
-            raise EAException("Error posting to Ryver: {}".format(e))
+            raise EAException("Error while contacting Ryver: {}".format(e))
+
+        self.check_ryver_response(response)
 
         elastalert_logger.info(self.log_message)
+
+    def check_ryver_response(self, response):
+        # Early status code check to try to produce a better error message out
+        # of the Ryver error message.
+        # This assumes the actual HTTP error has ht correct "Ryver error
+        # message" format (undocumented). Otherwise, this fails badly
+        if response.status_code == 400:
+            try:
+                message = "Error {} sending message to Ryver on {}: {}".format(
+                    response.status_code,
+                    response.url,
+                    ", ".join(d['message'] for d in response.json()['error']['details'])
+                )
+            except:
+                # If anything went wrong trying to manage this error, skip
+                # custom formatting and let the normal HTTP error handler take
+                # over.
+                pass
+            else:
+                raise EAException(message)
+
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+           raise EAException("Error posting to Ryver: {}".format(e))
 
     def get_info(self):
         return {
