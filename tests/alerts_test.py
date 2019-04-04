@@ -3,6 +3,7 @@ import datetime
 import json
 import subprocess
 from contextlib import nested
+import requests
 
 import mock
 import pytest
@@ -1995,6 +1996,103 @@ def test_ryver_required_params():
     alerter = RyverAlerter(rule)
 
     assert alerter.url == "https://organization.ryver.com/api/1/odata.svc/workrooms(789)/Chat.PostMessage()"
+
+
+def test_ryver_max_body():
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert': [],
+        'ryver_auth_basic': "auth",
+        'ryver_organization': "organization",
+        'ryver_topic_id': 47,
+    }
+
+    alerter = RyverAlerter(rule)
+    original = "a" * 50
+    max_size = 50
+
+    body = alerter.fit_body(original, max_size=max_size)
+    assert body == original
+    assert len(body) <= max_size
+
+    body = alerter.fit_body(original * 2, max_size=max_size)
+    assert body.endswith('content too big]')
+    assert len(body) <= max_size
+
+    # Maximum size officially supported by Ryver is 8192
+    body = alerter.fit_body("a" * 10000)
+    assert len(body) <= 8192
+
+    # The actual size limitation is against the number of bytes, we need to be
+    # sure the UTF-8 encoded body is equal or below the limitation.
+    max_size = 25
+    body = alerter.fit_body(u"é" * 25, max_size=max_size)
+    assert body.endswith(u'content too big]')
+    assert len(body) <= max_size
+    assert len(body.encode('utf-8')) <= max_size
+
+
+
+def test_ryver_check_response():
+    rule = {
+        'name': 'Test Rule',
+        'type': 'any',
+        'alert': [],
+        'ryver_auth_basic': "auth",
+        'ryver_organization': "organization",
+        'ryver_topic_id': 47,
+    }
+    alerter = RyverAlerter(rule)
+
+    # Managed error with a proper error message
+    r = requests.Response()
+    r.status_code = 400
+    r.url = "/foo/bar"
+    r._content = json.dumps({
+        'error': {
+            'code': 'client.http.error',
+            'lang': 'en-US',
+            'value': 'aaaaaa:\n    This value is too long. It should have 8192 bytes or less. (code aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee)\n',
+            'details': [{
+                'code': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+                'target': 'body',
+                'message': 'This value is too long. It should have 8192 bytes or less.'
+            }]
+        }
+    })
+
+    with pytest.raises(EAException) as exc:
+        alerter.check_ryver_response(r)
+
+    assert exc.value.message == "Error 400 sending message to Ryver on /foo/bar: This value is too long. It should have 8192 bytes or less."
+
+    # Managed error but not a Ryver-formatted error
+    r = requests.Response()
+    r.status_code = 400
+    r.url = "/foo/bar"
+    r._content = "45"
+
+    with pytest.raises(EAException) as exc:
+        alerter.check_ryver_response(r)
+
+    assert exc.value.message.startswith("Error posting to Ryver: 400 Client Error")
+
+    # Unexpected exception
+    r = requests.Response()
+    r.status_code = 500
+    r.reason = "Oh noes!"
+    r.url = "/foo/error"
+
+    with pytest.raises(EAException) as exc:
+        alerter.check_ryver_response(r)
+
+    assert exc.value.message == "Error posting to Ryver: 500 Server Error: Oh noes! for url: /foo/error"
+
+    # This should pass without problem.
+    r = requests.Response()
+    r.status_code = 200
+    alerter.check_ryver_response(r)
 
 
 def test_alerta_no_auth(ea):
