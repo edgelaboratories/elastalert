@@ -77,19 +77,24 @@ class RyverAlerter(Alerter):
         }
 
     def fit_body(self, body, max_size=8180):
-        """Ryver limits the body size to 8192 characters maximum.
+        """Ryver limits the body size to 8192 bytes maximum.
 
         If a message is too big, Ryver raises a HTTP 400 error so we try to
         accomodate the API before posting our alert.
         """
 
-        truncated = " [... content too big]"
+        body = body.encode("utf-8")
+
+        truncated = b" [... content too big]"
 
         if len(body) <= max_size:
             return body
 
         body = body[0:max_size - len(truncated)]
-        return body + truncated
+        # We may have cut right in the middle of a UTF-8-encoded character so
+        # we won't be able to decode it back to Unicode correctly. Ignore any
+        # errors in this case and dealwithit.
+        return (body + truncated).decode('utf-8', errors="ignore")
 
     def alert(self, matches):
         body = self.create_alert_body(matches)

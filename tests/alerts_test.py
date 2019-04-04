@@ -2024,6 +2024,15 @@ def test_ryver_max_body():
     body = alerter.fit_body("a" * 10000)
     assert len(body) <= 8192
 
+    # The actual size limitation is against the number of bytes, we need to be
+    # sure the UTF-8 encoded body is equal or below the limitation.
+    max_size = 25
+    body = alerter.fit_body(u"é" * 25, max_size=max_size)
+    assert body.endswith(u'content too big]')
+    assert len(body) <= max_size
+    assert len(body.encode('utf-8')) <= max_size
+
+
 
 def test_ryver_check_response():
     rule = {
